@@ -1,5 +1,17 @@
 ### Network ###
 
+variable "availability_zone_private" {
+  type = string
+  description = "The Availability Zone for private network resources"
+  default = "eu-central-1a"
+}
+
+variable "availability_zone_public" {
+  type = string
+  description = "The Availability Zone for public network resources"
+  default = "eu-central-1c"
+}
+
 variable "vpc_cidr_block" {
   type = string
   description = "VPC's IP range"
@@ -34,6 +46,12 @@ variable "public_subnet_name" {
   type = string
   description = "Public subnet's name"
   default = "Bestseller_public_subnet"
+}
+
+variable "internet_gateway_name" {
+  type = string
+  description = "Internet Gateway's name"
+  default = "Bestseller_gw"
 }
 
 ### EC2 ###
