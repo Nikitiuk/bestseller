@@ -35,3 +35,17 @@ variable "public_subnet_name" {
   description = "Public subnet's name"
   default = "Bestseller_public_subnet"
 }
+
+### EC2 ###
+
+variable "ec2_instance_type" {
+  type = string
+  description = "EC2 instance type"
+  default = "t2.micro"
+}
+
+variable "ec2_name" {
+  type = string
+  description = "EC2's name"
+  default = "Bestseller-Instance"
+}

@@ -75,3 +75,41 @@ resource "aws_iam_instance_profile" "bestseller_ec2_profile" {
   name = "bestseller_ec2_profile"
   role = aws_iam_role.bestseller_ec2_s3_role.name
 }
+
+### EC2 ###
+
+data "aws_ami" "ubuntu_2204" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"] # Canonical's owner ID
+}
+
+resource "aws_instance" "bestseller_instance" {
+  ami           = data.aws_ami.ubuntu_2204.id
+  instance_type = var.ec2_instance_type
+  subnet_id     = aws_subnet.bestseller_private_subnet.id
+  iam_instance_profile = aws_iam_instance_profile.bestseller_ec2_profile.name
+
+  user_data = <<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y httpd
+              systemctl start httpd
+              systemctl enable httpd
+              echo "<h1>Bestseller Technical assignment</h1>" > /var/www/html/index.html
+              EOF
+
+  tags = {
+    Name = var.ec2_name
+  }
+}
