@@ -26,3 +26,52 @@ resource "aws_subnet" "bestseller_public_subnet" {
     Name = var.public_subnet_name
   }
 }
+
+### IAM ###
+
+resource "aws_iam_role" "bestseller_ec2_s3_role" {
+  name = "bestseller_ec2_s3_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+resource "aws_iam_policy" "bestseller_s3_iam_policy" {
+  name        = "bestseller_s3_iam_policy"
+  description = "Allows EC2 instances to access S3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:Get*",
+          "s3:List*",
+          "s3:Put*",
+        ]
+        Effect = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "bestseller_ec2_s3_policy_attachment" {
+  role       = aws_iam_role.bestseller_ec2_s3_role.name
+  policy_arn = aws_iam_policy.bestseller_s3_iam_policy.arn
+}
+
+resource "aws_iam_instance_profile" "bestseller_ec2_profile" {
+  name = "bestseller_ec2_profile"
+  role = aws_iam_role.bestseller_ec2_s3_role.name
+}
