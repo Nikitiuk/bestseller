@@ -138,38 +138,6 @@ resource "aws_vpc_security_group_ingress_rule" "allow_http_ipv4" {
   to_port           = 80
 }
 
-### EC2 ###
-
-data "aws_ami" "ubuntu_2204" {
-  most_recent = true
-  owners = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-ebs"]
-  }
-}
-
-resource "aws_instance" "bestseller_instance" {
-  ami           = data.aws_ami.ubuntu_2204.id
-  instance_type = var.ec2_instance_type
-  subnet_id     = aws_subnet.bestseller_private_subnet.id
-  iam_instance_profile = aws_iam_instance_profile.bestseller_ec2_profile.name
-
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              yum install -y httpd
-              systemctl start httpd
-              systemctl enable httpd
-              echo "<h1>Bestseller Technical assignment</h1>" > /var/www/html/index.html
-              EOF
-
-  tags = {
-    Name = var.ec2_name
-  }
-}
-
 ### Load Balancer ###
 
 resource "aws_lb" "bestseller_lb" {
@@ -200,7 +168,98 @@ resource "aws_lb_listener" "http_listener" {
   }
 }
 
-resource "aws_lb_target_group_attachment" "bestseller_tg_attachment" {
-  target_group_arn = aws_lb_target_group.bestseller_tg.arn
-  target_id        = aws_instance.bestseller_instance.id
+### AutoScale Group ###
+
+# Get the latest AMI version of the Amazon Linux
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-hvm-*-x86_64-ebs"]
+  }
+}
+
+resource "aws_launch_configuration" "bestseller_lc" {
+  
+  instance_type = var.asg_instance_type
+  iam_instance_profile = aws_iam_instance_profile.bestseller_ec2_profile.name
+  name_prefix   = "bestseller-lc"
+  image_id      = data.aws_ami.amazon_linux.id
+
+  user_data = <<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y httpd
+              systemctl start httpd
+              systemctl enable httpd
+              echo "<h1>Bestseller Technical assignment</h1>" > /var/www/html/index.html
+              EOF
+}
+
+resource "aws_autoscaling_group" "bestseller_asg" {
+  launch_configuration = aws_launch_configuration.bestseller_lc.name
+  min_size             = 1
+  max_size             = 3
+  vpc_zone_identifier  = [aws_subnet.bestseller_private_subnet.id]
+  target_group_arns    = [aws_lb_target_group.bestseller_tg.arn]
+
+  tag {
+    key                 = "Name"
+    value               = var.asg_name
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_policy" "scale_out" {
+  name                   = "scale-out"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.bestseller_asg.name
+
+  policy_type = "SimpleScaling"
+}
+
+resource "aws_autoscaling_policy" "scale_in" {
+  name                   = "scale-in"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = aws_autoscaling_group.bestseller_asg.name
+
+  policy_type = "SimpleScaling"
+}
+
+resource "aws_cloudwatch_metric_alarm" "high_cpu" {
+  alarm_name          = "high-cpu-usage"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "120"
+  statistic           = "Average"
+  threshold           = "80"
+  alarm_actions       = [aws_autoscaling_policy.scale_out.arn]
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.bestseller_asg.name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "low_cpu" {
+  alarm_name          = "low-cpu-usage"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "2"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "120"
+  statistic           = "Average"
+  threshold           = "60"
+  alarm_actions       = [aws_autoscaling_policy.scale_in.arn]
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.bestseller_asg.name
+  }
 }

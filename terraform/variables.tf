@@ -54,16 +54,16 @@ variable "internet_gateway_name" {
   default = "Bestseller_gw"
 }
 
-### EC2 ###
+### AutoScale Group ###
 
-variable "ec2_instance_type" {
+variable "asg_instance_type" {
   type = string
-  description = "EC2 instance type"
+  description = "Instance type used on ASG"
   default = "t2.micro"
 }
 
-variable "ec2_name" {
+variable "asg_name" {
   type = string
-  description = "EC2's name"
-  default = "Bestseller-Instance"
+  description = "ASG instance's name"
+  default = "Bestseller-ASG-Instance"
 }
